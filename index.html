@@ -1,0 +1,526 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Escapade du Patrimoine — carte réelle</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,700;1,9..144,500&family=Public+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+
+<style>
+  :root{
+    color-scheme: light dark;
+    --ink: #14192b;
+    --parchment: #f6f1e2;
+    --parchment-2: #ece2c8;
+    --gold: #b8862e;
+    --gold-soft: #e3c07c;
+    --rose: #c85272;
+    --ink-text: #211c14;
+    --cream-text: #f6efe0;
+    --line: #d9cca4;
+    --ok: #3f7a4f;
+    --ok-bg: #e3efe0;
+    --bad: #a8412f;
+    --bad-bg: #f6e2dc;
+    --shadow: 0 14px 32px -18px rgba(20,17,8,.45);
+    --bg-page: var(--parchment);
+    --surface: #fffdf6;
+    --surface-2: var(--parchment-2);
+    --text: var(--ink-text);
+    --text-soft: #5c5340;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg-page: #100d17;
+      --surface: #1c1728;
+      --surface-2: #241d33;
+      --text: #f1e9d8;
+      --text-soft: #c3b9a3;
+      --line: #3a3050;
+      --ok: #7cc98f;
+      --ok-bg: #1e3324;
+      --bad: #e0917f;
+      --bad-bg: #3a2320;
+      --shadow: 0 18px 36px -18px rgba(0,0,0,.65);
+    }
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0; padding:0;}
+  body{
+    background:var(--bg-page); color:var(--text);
+    font-family:'Public Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    padding:0 16px; padding-block: 28px 60px; line-height:1.5;
+  }
+  .wrap{max-width: 760px; margin: 0 auto;}
+  h1,h2,h3{font-family:'Fraunces', Georgia, serif; text-wrap:balance; margin:0;}
+  .eyebrow{
+    font-family:'JetBrains Mono', monospace; font-size:.72rem; letter-spacing:.14em;
+    text-transform:uppercase; color:var(--gold); font-weight:500;
+  }
+  header{position:relative; text-align:center; padding: 8px 0 22px;}
+  header h1{font-size: clamp(1.9rem, 6vw, 2.7rem); font-weight:700; color:var(--text);}
+  header p.sub{max-width: 520px; margin: 12px auto 0; color:var(--text-soft); font-size:.98rem;}
+  .datebar{
+    display:inline-flex; gap:10px; align-items:center; margin-top:16px;
+    background:var(--surface); border:1px solid var(--line); border-radius:999px;
+    padding:7px 16px; box-shadow:var(--shadow); font-size:.85rem;
+  }
+  .datebar b{font-weight:600;}
+
+  #scorechip{
+    position:fixed; top: calc(env(safe-area-inset-top,0px) + 12px); right:16px;
+    z-index:1000; background:var(--ink); color:var(--cream-text);
+    border-radius:999px; padding:8px 14px 8px 10px; display:flex; align-items:center; gap:8px;
+    box-shadow: var(--shadow); border:1px solid rgba(255,255,255,.12);
+    font-family:'JetBrains Mono', monospace; font-size:.78rem;
+  }
+  #scorechip b{color:var(--gold-soft); font-size:.9rem;}
+  #resetbtn{
+    font-family:'JetBrains Mono', monospace; font-size:.68rem; color:var(--cream-text);
+    background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.25); border-radius:999px;
+    padding:4px 10px; cursor:pointer; margin-left:2px;
+  }
+  #resetbtn:hover{background:rgba(255,255,255,.22);}
+
+  .map-card{
+    background:var(--surface); border-radius:22px; padding: 10px;
+    box-shadow:var(--shadow); margin: 26px 0 30px; border:1px solid var(--line);
+  }
+  .map-card .maplabel{
+    color:var(--text-soft); font-family:'JetBrains Mono',monospace; font-size:.7rem;
+    letter-spacing:.1em; text-transform:uppercase; padding: 4px 6px 10px;
+  }
+  #map{
+    width:100%; height: 380px; border-radius:14px; overflow:hidden;
+    border:1px solid var(--line);
+  }
+  .num-pin{
+    background: var(--gold); color:#1c1a17; border:2px solid #fff; border-radius:50%;
+    width:30px; height:30px; display:flex; align-items:center; justify-content:center;
+    font-family:'Fraunces', serif; font-weight:700; font-size:14px; box-shadow: 0 3px 8px rgba(0,0,0,.35);
+  }
+  .leaflet-popup-content{font-family:'Public Sans', sans-serif; font-size:.85rem; max-width:220px;}
+  .leaflet-popup-content b{font-family:'Fraunces', serif;}
+
+  .stop{
+    background:var(--surface); border:1px solid var(--line); border-radius:18px;
+    margin-bottom:16px; box-shadow:var(--shadow); overflow:hidden;
+  }
+  .stop-head{
+    display:flex; gap:14px; align-items:flex-start; padding:16px 18px; cursor:pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .num{
+    flex: 0 0 auto; width:34px; height:34px; border-radius:50%;
+    background: var(--gold); color:#fff; display:flex; align-items:center; justify-content:center;
+    font-family:'Fraunces', serif; font-weight:700; font-size:1rem;
+  }
+  .stop.answered-both .num{ background: var(--rose); }
+  .stop-meta{flex:1; min-width:0;}
+  .stop-meta h2{font-size:1.18rem; font-weight:600; color:var(--text);}
+  .stop-meta .place{color:var(--text-soft); font-size:.85rem; margin-top:2px;}
+  .stop-meta .tags{display:flex; gap:6px; flex-wrap:wrap; margin-top:8px;}
+  .tag{
+    font-family:'JetBrains Mono', monospace; font-size:.68rem; letter-spacing:.03em;
+    padding:3px 8px; border-radius:999px; border:1px solid var(--line); color:var(--text-soft);
+  }
+  .tag.time{color:var(--gold); border-color: var(--gold-soft); }
+  .chev{flex:0 0 auto; color:var(--text-soft); transition:transform .25s ease; margin-top:6px;}
+  .stop.open .chev{transform: rotate(180deg);}
+  .stop-body{padding: 0 18px 18px; display:none;}
+  .stop.open .stop-body{display:block;}
+  .stop-body .tip{
+    background:var(--surface-2); border-radius:12px; padding:12px 14px; font-size:.92rem;
+    margin-bottom:14px; color:var(--text);
+  }
+  .stop-body .tip b{color:var(--gold); font-weight:600;}
+  .quiz h3{font-size:.95rem; font-weight:700; margin-bottom:10px; color:var(--text);}
+  .q{margin-bottom:16px;}
+  .q p.qtext{font-weight:600; margin:0 0 8px; font-size:.95rem;}
+  .choices{display:grid; gap:8px;}
+  button.choice{
+    text-align:left; font-family:inherit; font-size:.9rem; padding:10px 12px;
+    border-radius:10px; border:1px solid var(--line); background:var(--surface);
+    color:var(--text); cursor:pointer; transition: border-color .15s, background .15s;
+  }
+  button.choice:hover{border-color: var(--gold);}
+  button.choice:disabled{cursor:default;}
+  button.choice.correct{background:var(--ok-bg); border-color:var(--ok); color:var(--ok);}
+  button.choice.wrong{background:var(--bad-bg); border-color:var(--bad); color:var(--bad);}
+  .explain{font-size:.85rem; color:var(--text-soft); margin-top:8px; padding-left:2px; display:none;}
+  .explain.show{display:block;}
+  .cert-card{
+    background: linear-gradient(160deg, var(--surface) 0%, var(--surface-2) 100%);
+    border:1.5px solid var(--gold-soft); border-radius:20px; padding:22px 20px;
+    box-shadow:var(--shadow); text-align:center; margin-bottom:18px;
+  }
+  .cert-card h2{font-size:1.3rem; color:var(--gold); margin-bottom:14px;}
+  .cert-progress{margin-bottom:16px;}
+  .cert-bar{height:8px; border-radius:999px; background:var(--surface-2); border:1px solid var(--line); overflow:hidden; margin-bottom:6px;}
+  .cert-bar-fill{height:100%; width:0%; background: linear-gradient(90deg, var(--gold), var(--rose)); transition: width .4s ease;}
+  #certprogresstext{font-family:'JetBrains Mono', monospace; font-size:.78rem; color:var(--text-soft);}
+  .cert-names{display:flex; align-items:center; justify-content:center; gap:10px; margin-bottom:16px; flex-wrap:wrap;}
+  .cert-names input{
+    font-family:'Fraunces', serif; font-size:1rem; text-align:center; padding:8px 12px;
+    border-radius:10px; border:1px solid var(--line); background:var(--surface); color:var(--text);
+    max-width:160px;
+  }
+  .cert-names .amp{font-family:'Fraunces', serif; font-style:italic; color:var(--text-soft);}
+  .cert-result{border-top:1px dashed var(--line); padding-top:16px;}
+  .cert-title{font-family:'Fraunces', serif; font-size:1.35rem; font-weight:700; color:var(--text); text-wrap:balance;}
+  .cert-sub{font-size:.85rem; color:var(--text-soft); margin-top:6px;}
+  .quiz h3 .theme{color:var(--gold); font-weight:600;}
+
+  footer{margin-top: 34px; text-align:center; color:var(--text-soft); font-size:.82rem;}
+  footer .badge{font-family:'Fraunces', serif; font-size:1.2rem; color:var(--gold); margin-bottom:6px; display:block;}
+  @media (max-width:480px){
+    .stop-head{padding:14px;}
+    .stop-body{padding:0 14px 14px;}
+    #map{height:320px;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div id="scorechip"><span>♥ ♥</span> Score du duo — <b><span id="scoreval">0</span> / <span id="scoretotal">6</span></b> <button type="button" id="resetbtn">Recommencer</button></div>
+
+  <header>
+    <div class="eyebrow">Journées européennes du patrimoine · 43ᵉ édition</div>
+    <h1>Le grand quiz de l'histoire de France</h1>
+    <p class="sub">Restez attentifs pendant les visites, les indices sont dans les détails. Peut-être de quoi décrocher le passeport rouge. Carte réelle OpenStreetMap, zoomez et suivez le parcours en vrai.</p>
+    <div class="datebar">
+      <span>📍 3 étapes</span> · <span>🚶 ~3,5 km</span> · <b>Dimanche 20 septembre 2026</b>
+    </div>
+  </header>
+
+  <div class="map-card">
+    <div class="maplabel">Carte OpenStreetMap — touchez un repère pour le détail</div>
+    <div id="map"></div>
+  </div>
+
+  <div id="stops"></div>
+
+  <div class="cert-card" id="certcard">
+    <h2>Certificat de Naturalisation Historique</h2>
+    <div class="cert-progress">
+      <div class="cert-bar"><div class="cert-bar-fill" id="certbarfill"></div></div>
+      <span id="certprogresstext">0 / 15 bonnes réponses</span>
+    </div>
+    <div class="cert-names">
+      <input type="text" id="certname1" placeholder="Prénom 1" maxlength="40">
+      <span class="amp">&amp;</span>
+      <input type="text" id="certname2" placeholder="Prénom 2" maxlength="40">
+    </div>
+    <div class="cert-result" id="certresult">
+      <div class="cert-title" id="certtitle">Répondez aux quiz pour débloquer votre titre</div>
+      <div class="cert-sub" id="certsub">Chaque bonne réponse rapproche du grand jour.</div>
+    </div>
+  </div>
+
+  <footer>
+  </footer>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  var STOPS = [
+    {
+      id: "stop-1", title: "Musée de la Chasse et de la Nature",
+      place: "62 rue des Archives, 75003 — Le Marais",
+      lat: 48.8608, lng: 2.3591,
+      time: "13h00", tags: ["Gratuit", "Sans réservation", "11h–18h", "Point de départ"],
+      tip: "Rendez-vous ici pour démarrer : animaux naturalisés, salons du XVIIe et art contemporain se répondent d'une pièce à l'autre.",
+      theme: "La chasse en France",
+      questions: [
+        { q: "Quelle chasse traditionnelle française consiste à poursuivre un animal à cheval, avec une meute de chiens ?",
+          choices: ["La chasse à l'arc", "La chasse à courre", "La chasse à l'affût", "La chasse à la passée"],
+          correct: 1, explain: "Pratiquée depuis le Moyen Âge, la vénerie reste une tradition vivante en forêt de Chantilly ou de Fontainebleau." },
+        { q: "Quel document officiel est obligatoire pour chasser légalement en France ?",
+          choices: ["Le permis de chasser", "Le permis de conduire", "La carte de pêche", "La carte vitale"],
+          correct: 0, explain: "Délivré après un examen théorique et pratique, il conditionne le droit de chasser sur le territoire." },
+        { q: "Quelle organisation fédère les chasseurs français au niveau national ?",
+          choices: ["L'Office national des forêts", "La Ligue de protection des oiseaux", "La Fédération nationale des chasseurs", "Le Muséum national d'histoire naturelle"],
+          correct: 2, explain: "Elle regroupe les fédérations départementales et représente environ un million de chasseurs français." },
+        { q: "En France, à quelle période de l'année la saison de chasse se déroule-t-elle en majorité ?",
+          choices: ["De l'automne à l'hiver", "Uniquement l'été", "Toute l'année sans exception", "Uniquement au printemps"],
+          correct: 0, explain: "Les dates varient selon les espèces et les départements, mais l'essentiel de la saison court de septembre à février." },
+        { q: "Quel gibier est l'animal emblématique de la chasse à courre en France ?",
+          choices: ["Le canard", "Le lapin", "Le cerf", "Le faisan"],
+          correct: 2, explain: "La vénerie du cerf est la forme la plus ancienne et la plus codifiée de la chasse à courre française." }
+      ]
+    },
+    {
+      id: "stop-2", title: "Grand Orient de France",
+      place: "16 rue Cadet, 75009",
+      lat: 48.8763, lng: 2.3418,
+      time: "14h30", tags: ["Gratuit", "Sans réservation", "10h–18h"],
+      tip: "Environ 20-25 min depuis le Marais. Le siège de la plus ancienne obédience maçonnique française ouvre son musée et ses temples le temps d'un week-end, avec des visites guidées par des francs-maçons.",
+      theme: "La franc-maçonnerie en France",
+      questions: [
+        { q: "Combien d'obédiences maçonniques coexistent aujourd'hui en France ?",
+          choices: ["Une seule", "Une dizaine", "Plus d'une centaine", "Aucune, c'est interdit"],
+          correct: 1, explain: "Grand Orient de France, Grande Loge de France, Grande Loge Nationale Française en sont les principales." },
+        { q: "Quel symbole, hérité des outils des bâtisseurs de cathédrales, identifie la franc-maçonnerie ?",
+          choices: ["La croix de Lorraine", "L'équerre et le compas", "Le coq gaulois", "La fleur de lys"],
+          correct: 1, explain: "Ces deux instruments de mesure sont devenus les symboles fondateurs de l'ordre maçonnique." },
+        { q: "Quelle grande loi de la Troisième République, portée par des responsables politiques francs-maçons, sépare l'Église et l'État en 1905 ?",
+          choices: ["Le Code civil", "La loi Jules Ferry", "La loi de séparation des Églises et de l'État", "La loi Falloux"],
+          correct: 2, explain: "Nombre de ses artisans, comme Aristide Briand, sont issus des loges maçonniques françaises." },
+        { q: "Comment appelle-t-on les réunions rituelles régulières d'une loge maçonnique ?",
+          choices: ["Les tenues", "Les séances", "Les assemblées", "Les synodes"],
+          correct: 0, explain: "Terme consacré désignant les réunions au cours desquelles les frères et sœurs se retrouvent." },
+        { q: "Quelle grande obédience française, fondée en 1773, admet les femmes dans ses rangs depuis 2010 ?",
+          choices: ["La Grande Loge Nationale Française", "L'Ordre du Temple", "Le Rite Écossais seul", "Le Grand Orient de France"],
+          correct: 3, explain: "Le Grand Orient de France, la plus ancienne obédience du pays, ouvre ses loges aux femmes en 2010." }
+      ]
+    },
+    {
+      id: "stop-3", title: "La Conciergerie",
+      place: "2 boulevard du Palais, 75001 — Île de la Cité",
+      lat: 48.8557, lng: 2.3453,
+      time: "16h00", tags: ["Gratuit", "Sans réservation", "9h30–17h — dernier créneau"],
+      tip: "Pour finir : ~20-25 min en métro depuis la rue Cadet. Ancien palais royal devenu prison de la Révolution, avec la Salle des Gens d'Armes. Fermeture à 17h, ne traînez pas trop.",
+      theme: "La Conciergerie",
+      questions: [
+        { q: "La Conciergerie faisait partie de quel ensemble, résidence des rois de France jusqu'au XIVe siècle ?",
+          choices: ["Le Palais de la Cité", "Le Louvre", "Le Palais du Luxembourg", "Le Palais Royal"],
+          correct: 0, explain: "Les rois capétiens y résident avant que la cour ne s'installe au Louvre, laissant le lieu à la justice." },
+        { q: "Comment s'appelle l'immense salle gothique du XIVe siècle, l'une des plus grandes d'Europe, construite sous Philippe le Bel ?",
+          choices: ["La Sainte-Chapelle", "La Salle des Gens d'Armes", "La Grande Galerie", "La Salle du Trône"],
+          correct: 1, explain: "Elle servait de réfectoire aux centaines d'agents et gardes du palais royal." },
+        { q: "Quelle reine de France a été emprisonnée à la Conciergerie avant son exécution en 1793 ?",
+          choices: ["Anne d'Autriche", "Catherine de Médicis", "Marie-Antoinette", "Marie de Médicis"],
+          correct: 2, explain: "Sa cellule, transformée en chapelle expiatoire au XIXe siècle, se visite encore aujourd'hui." },
+        { q: "Quel surnom donnait-on à la Conciergerie pendant la Terreur, vu le sort réservé à ses prisonniers ?",
+          choices: ["Le nid des aigles", "L'antichambre de la mort", "La maison du roi", "Le grenier à sel"],
+          correct: 1, explain: "Près de 2 700 personnes y transitent avant leur jugement puis la guillotine, entre 1793 et 1794." },
+        { q: "Quelle tour de la Conciergerie porte la première horloge publique de Paris, installée à la fin du XIVe siècle ?",
+          choices: ["La Tour Bonbec", "La Tour de l'Horloge", "La Tour d'Argent", "La Tour César"],
+          correct: 1, explain: "Installée vers 1370-1371, elle donne encore l'heure aux Parisiens depuis la rue de la Cité." }
+      ]
+    }
+  ];
+
+  var TOTAL_Q = STOPS.reduce(function(s, st){ return s + st.questions.length; }, 0);
+  var state = { answered: {} };
+
+  function loadState(){
+    try{
+      var raw = localStorage.getItem("patrimoine-date-state-v2");
+      if(raw){ var parsed = JSON.parse(raw); if(parsed && parsed.answered) state.answered = parsed.answered; }
+    }catch(e){}
+  }
+  function saveState(){
+    try{ localStorage.setItem("patrimoine-date-state-v2", JSON.stringify(state)); }catch(e){}
+  }
+  function resetQuiz(){
+    state.answered = {};
+    saveState();
+    renderStops();
+    updateScoreUI();
+    var first = document.getElementById(STOPS[0].id);
+    if(first) first.classList.add("open");
+  }
+  function score(){
+    var n = 0; for(var k in state.answered){ if(state.answered[k] === true) n++; } return n;
+  }
+  function updateScoreUI(){
+    document.getElementById("scoreval").textContent = score();
+    document.getElementById("scoretotal").textContent = TOTAL_Q;
+    var s = score(); var badge = document.getElementById("finalbadge");
+    if(badge){
+      if(s === TOTAL_Q){ badge.textContent = "Duo d'incollables du patrimoine ★"; }
+      else if(s >= TOTAL_Q * 0.6){ badge.textContent = "Très joli score, bravo à vous deux"; }
+      else { badge.textContent = "Bonne balade !"; }
+    }
+    STOPS.forEach(function(st){
+      var allDone = st.questions.every(function(_, i){ return state.answered.hasOwnProperty(st.id + "-" + i); });
+      var el = document.getElementById(st.id);
+      if(el){ el.classList.toggle("answered-both", allDone); }
+    });
+    updateCertUI();
+  }
+
+  var CERT_TIERS = [
+    { min: 15, title: "Naturalisée avec mention Très Bien 🇫🇷", sub: "15/15 : dossier en béton, la préfecture n'a plus qu'à valider." },
+    { min: 11, title: "Naturalisation en bonne voie", sub: "Un excellent score — encore quelques révisions pour le sans-faute." },
+    { min: 7,  title: "Carte de séjour renouvelée avec les honneurs", sub: "Solide ! Encore un petit effort pour la mention Très Bien." },
+    { min: 3,  title: "Stage de révision recommandé (au café, avec un croissant)", sub: "Pas mal, mais l'entretien officiel demandera un peu plus de révisions." },
+    { min: 0,  title: "Retour à la case Vercingétorix", sub: "On reprend depuis les Gaulois — deuxième tentative autorisée." }
+  ];
+
+  function certNames(){
+    try{
+      var n1 = document.getElementById("certname1").value.trim();
+      var n2 = document.getElementById("certname2").value.trim();
+      return { n1: n1, n2: n2 };
+    }catch(e){ return { n1: "", n2: "" }; }
+  }
+  function loadNames(){
+    try{
+      var raw = localStorage.getItem("patrimoine-date-names");
+      if(raw){ var n = JSON.parse(raw); document.getElementById("certname1").value = n.n1 || ""; document.getElementById("certname2").value = n.n2 || ""; }
+    }catch(e){}
+  }
+  function saveNames(){
+    try{ localStorage.setItem("patrimoine-date-names", JSON.stringify(certNames())); }catch(e){}
+  }
+  function updateCertUI(){
+    var s = score();
+    var pct = TOTAL_Q ? Math.round((s / TOTAL_Q) * 100) : 0;
+    document.getElementById("certbarfill").style.width = pct + "%";
+    document.getElementById("certprogresstext").textContent = s + " / " + TOTAL_Q + " bonnes réponses";
+    var tier = CERT_TIERS[CERT_TIERS.length - 1];
+    for(var i = 0; i < CERT_TIERS.length; i++){
+      if(s >= CERT_TIERS[i].min){ tier = CERT_TIERS[i]; break; }
+    }
+    var names = certNames();
+    var namesLabel = (names.n1 && names.n2) ? (names.n1 + " & " + names.n2) : (names.n1 || names.n2 || "");
+    var titleEl = document.getElementById("certtitle");
+    var subEl = document.getElementById("certsub");
+    if(s === 0){
+      titleEl.textContent = "Répondez aux quiz pour débloquer votre titre";
+      subEl.textContent = "Chaque bonne réponse rapproche du grand jour.";
+    } else {
+      titleEl.textContent = (namesLabel ? namesLabel + " — " : "") + tier.title;
+      subEl.textContent = tier.sub;
+    }
+  }
+
+  function renderStops(){
+    var container = document.getElementById("stops");
+    container.innerHTML = "";
+    STOPS.forEach(function(st, idx){
+      var wrap = document.createElement("div");
+      wrap.className = "stop"; wrap.id = st.id;
+      var tagsHtml = st.tags.map(function(t){ return '<span class="tag">' + t + '</span>'; }).join("");
+      wrap.innerHTML =
+        '<div class="stop-head" data-toggle="' + st.id + '">' +
+          '<div class="num">' + (idx + 1) + '</div>' +
+          '<div class="stop-meta">' +
+            '<h2>' + st.title + '</h2>' +
+            '<div class="place">' + st.place + '</div>' +
+            '<div class="tags"><span class="tag time">' + st.time + '</span>' + tagsHtml + '</div>' +
+          '</div>' +
+          '<svg class="chev" width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+        '</div>' +
+        '<div class="stop-body">' +
+          '<div class="tip"><b>Le mot de l\'étape.</b> ' + st.tip + '</div>' +
+          '<div class="quiz"><h3>Quiz — Histoire de France · <span class="theme">' + st.theme + '</span></h3><div class="qlist"></div></div>' +
+        '</div>';
+      container.appendChild(wrap);
+
+      var qlist = wrap.querySelector(".qlist");
+      st.questions.forEach(function(q, qi){
+        var qEl = document.createElement("div");
+        qEl.className = "q";
+        var key = st.id + "-" + qi;
+        var already = state.answered.hasOwnProperty(key);
+        var choicesHtml = q.choices.map(function(c, ci){
+          var cls = "choice"; var disabled = "";
+          if(already){ disabled = "disabled"; if(ci === q.correct) cls += " correct"; }
+          return '<button type="button" class="' + cls + '" data-qkey="' + key + '" data-ci="' + ci + '" data-correct="' + q.correct + '" ' + disabled + '>' + c + '</button>';
+        }).join("");
+        qEl.innerHTML =
+          '<p class="qtext">' + (qi + 1) + '. ' + q.q + '</p>' +
+          '<div class="choices">' + choicesHtml + '</div>' +
+          '<p class="explain' + (already ? ' show' : '') + '">' + q.explain + '</p>';
+        qlist.appendChild(qEl);
+      });
+    });
+  }
+
+  function onChoiceClick(e){
+    var btn = e.target.closest(".choice");
+    if(!btn || btn.disabled) return;
+    var key = btn.getAttribute("data-qkey");
+    var correctIdx = parseInt(btn.getAttribute("data-correct"), 10);
+    var chosenIdx = parseInt(btn.getAttribute("data-ci"), 10);
+    var isCorrect = chosenIdx === correctIdx;
+    var group = btn.closest(".choices");
+    group.querySelectorAll(".choice").forEach(function(b){
+      b.disabled = true;
+      var ci = parseInt(b.getAttribute("data-ci"), 10);
+      if(ci === correctIdx) b.classList.add("correct");
+      else if(b === btn) b.classList.add("wrong");
+    });
+    var explain = group.parentElement.querySelector(".explain");
+    if(explain) explain.classList.add("show");
+    state.answered[key] = isCorrect;
+    saveState();
+    updateScoreUI();
+  }
+
+  function onHeadClick(e){
+    var head = e.target.closest(".stop-head");
+    if(!head) return;
+    document.getElementById(head.getAttribute("data-toggle")).classList.toggle("open");
+  }
+
+  function openStop(id){
+    var el = document.getElementById(id);
+    if(!el) return;
+    el.classList.add("open");
+    el.scrollIntoView({behavior:"smooth", block:"center"});
+  }
+
+  function initMap(){
+    var map = L.map('map', { scrollWheelZoom: false }).setView([48.863, 2.352], 14);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    }).addTo(map);
+
+    var latlngs = STOPS.map(function(st){ return [st.lat, st.lng]; });
+    L.polyline(latlngs, { color: '#c85272', weight: 3, dashArray: '6 6', opacity: .85 }).addTo(map);
+
+    STOPS.forEach(function(st, idx){
+      var icon = L.divIcon({
+        className: '',
+        html: '<div class="num-pin">' + (idx + 1) + '</div>',
+        iconSize: [30, 30],
+        iconAnchor: [15, 15]
+      });
+      var marker = L.marker([st.lat, st.lng], { icon: icon }).addTo(map);
+      marker.bindPopup('<b>' + st.title + '</b><br>' + st.place + '<br><span style="color:#b8862e">' + st.time + '</span>');
+      marker.on('click', function(){ openStop(st.id); });
+    });
+
+    var bounds = L.latLngBounds(latlngs);
+    map.fitBounds(bounds, { padding: [40, 40] });
+  }
+
+  loadState();
+  renderStops();
+  updateScoreUI();
+
+  document.getElementById("stops").addEventListener("click", function(e){
+    onChoiceClick(e);
+    onHeadClick(e);
+  });
+
+  var first = document.getElementById(STOPS[0].id);
+  if(first) first.classList.add("open");
+
+  loadNames();
+  ["certname1", "certname2"].forEach(function(id){
+    document.getElementById(id).addEventListener("input", function(){
+      saveNames();
+      updateCertUI();
+    });
+  });
+  updateCertUI();
+
+  document.getElementById("resetbtn").addEventListener("click", resetQuiz);
+
+  if(window.L){ initMap(); }
+})();
+</script>
+</body>
+</html>
