@@ -174,6 +174,14 @@
   .cert-title{font-family:'Fraunces', serif; font-size:1.35rem; font-weight:700; color:var(--text); text-wrap:balance;}
   .cert-sub{font-size:.85rem; color:var(--text-soft); margin-top:6px;}
   .quiz h3 .theme{color:var(--gold); font-weight:600;}
+  .next-reveal{margin-top:18px; padding-top:16px; border-top:1px dashed var(--line); text-align:center;}
+  .next-label{font-family:'JetBrains Mono', monospace; font-size:.72rem; color:var(--text-soft); text-transform:uppercase; letter-spacing:.04em; margin-bottom:10px;}
+  .next-btn{
+    font-family:'Fraunces', serif; font-size:1rem; font-weight:600; color:#1c1a17;
+    background: linear-gradient(90deg, var(--gold), var(--rose)); border:none; border-radius:999px;
+    padding:12px 22px; cursor:pointer; box-shadow:var(--shadow);
+  }
+  .next-btn:hover{filter:brightness(1.05);}
 
   footer{margin-top: 34px; text-align:center; color:var(--text-soft); font-size:.82rem;}
   footer .badge{font-family:'Fraunces', serif; font-size:1.2rem; color:var(--gold); margin-bottom:6px; display:block;}
@@ -193,7 +201,7 @@
     <h1>Le grand quiz de l'histoire de France</h1>
     <p class="sub">Restez attentifs pendant les visites, les indices sont dans les détails. Peut-être de quoi décrocher le passeport rouge. Carte réelle OpenStreetMap, zoomez et suivez le parcours en vrai.</p>
     <div class="datebar">
-      <span>📍 3 étapes</span> · <span>🚶 ~3,5 km</span> · <b>Dimanche 20 septembre 2026</b>
+      <span>📍 3 étapes + 1 pause</span> · <span>🚶 ~3,5 km</span> · <b>Dimanche 20 septembre 2026</b>
     </div>
   </header>
 
@@ -211,9 +219,7 @@
       <span id="certprogresstext">0 / 15 bonnes réponses</span>
     </div>
     <div class="cert-names">
-      <input type="text" id="certname1" placeholder="Prénom 1" maxlength="40">
-      <span class="amp">&amp;</span>
-      <input type="text" id="certname2" placeholder="Prénom 2" maxlength="40">
+      <input type="text" id="certname1" placeholder="Ton prénom" maxlength="40">
     </div>
     <div class="cert-result" id="certresult">
       <div class="cert-title" id="certtitle">Répondez aux quiz pour débloquer votre titre</div>
@@ -256,11 +262,20 @@
       ]
     },
     {
+      id: "stop-brunch", title: "Brunch chez Cult",
+      place: "13 rue La Fayette, 75009",
+      lat: 48.8759, lng: 2.3434,
+      time: "14h15", tags: ["Pause déj", "Sur réservation conseillée"],
+      tip: "Petite pause entre les deux premières étapes : un bon latte et un brunch chez Cult avant de repartir vers le Grand Orient. Comptez 45 min à 1h.",
+      theme: "", isBreak: true,
+      questions: []
+    },
+    {
       id: "stop-2", title: "Grand Orient de France",
       place: "16 rue Cadet, 75009",
       lat: 48.8763, lng: 2.3418,
-      time: "14h30", tags: ["Gratuit", "Sans réservation", "10h–18h"],
-      tip: "Environ 20-25 min depuis le Marais. Le siège de la plus ancienne obédience maçonnique française ouvre son musée et ses temples le temps d'un week-end, avec des visites guidées par des francs-maçons.",
+      time: "15h15", tags: ["Gratuit", "Sans réservation", "10h–18h"],
+      tip: "Environ 10 min à pied depuis Cult. Le siège de la plus ancienne obédience maçonnique française ouvre son musée et ses temples le temps d'un week-end, avec des visites guidées par des francs-maçons.",
       theme: "La franc-maçonnerie en France",
       questions: [
         { q: "Combien d'obédiences maçonniques coexistent aujourd'hui en France ?",
@@ -284,7 +299,7 @@
       id: "stop-3", title: "La Conciergerie",
       place: "2 boulevard du Palais, 75001 — Île de la Cité",
       lat: 48.8557, lng: 2.3453,
-      time: "16h00", tags: ["Gratuit", "Sans réservation", "9h30–17h — dernier créneau"],
+      time: "16h15", tags: ["Gratuit", "Sans réservation", "9h30–17h — dernier créneau"],
       tip: "Pour finir : ~20-25 min en métro depuis la rue Cadet. Ancien palais royal devenu prison de la Révolution, avec la Salle des Gens d'Armes. Fermeture à 17h, ne traînez pas trop.",
       theme: "La Conciergerie",
       questions: [
@@ -308,12 +323,17 @@
   ];
 
   var TOTAL_Q = STOPS.reduce(function(s, st){ return s + st.questions.length; }, 0);
-  var state = { answered: {} };
+  var state = { answered: {}, unlocked: 1 };
+  var openStops = {};
 
   function loadState(){
     try{
       var raw = localStorage.getItem("patrimoine-date-state-v2");
-      if(raw){ var parsed = JSON.parse(raw); if(parsed && parsed.answered) state.answered = parsed.answered; }
+      if(raw){
+        var parsed = JSON.parse(raw);
+        if(parsed && parsed.answered) state.answered = parsed.answered;
+        if(parsed && parsed.unlocked) state.unlocked = parsed.unlocked;
+      }
     }catch(e){}
   }
   function saveState(){
@@ -321,11 +341,12 @@
   }
   function resetQuiz(){
     state.answered = {};
+    state.unlocked = 1;
+    openStops = {};
+    openStops[STOPS[0].id] = true;
     saveState();
     renderStops();
     updateScoreUI();
-    var first = document.getElementById(STOPS[0].id);
-    if(first) first.classList.add("open");
   }
   function score(){
     var n = 0; for(var k in state.answered){ if(state.answered[k] === true) n++; } return n;
@@ -358,14 +379,13 @@
   function certNames(){
     try{
       var n1 = document.getElementById("certname1").value.trim();
-      var n2 = document.getElementById("certname2").value.trim();
-      return { n1: n1, n2: n2 };
-    }catch(e){ return { n1: "", n2: "" }; }
+      return { n1: n1 };
+    }catch(e){ return { n1: "" }; }
   }
   function loadNames(){
     try{
       var raw = localStorage.getItem("patrimoine-date-names");
-      if(raw){ var n = JSON.parse(raw); document.getElementById("certname1").value = n.n1 || ""; document.getElementById("certname2").value = n.n2 || ""; }
+      if(raw){ var n = JSON.parse(raw); document.getElementById("certname1").value = n.n1 || ""; }
     }catch(e){}
   }
   function saveNames(){
@@ -381,7 +401,7 @@
       if(s >= CERT_TIERS[i].min){ tier = CERT_TIERS[i]; break; }
     }
     var names = certNames();
-    var namesLabel = (names.n1 && names.n2) ? (names.n1 + " & " + names.n2) : (names.n1 || names.n2 || "");
+    var namesLabel = names.n1 || "";
     var titleEl = document.getElementById("certtitle");
     var subEl = document.getElementById("certsub");
     if(s === 0){
@@ -396,9 +416,10 @@
   function renderStops(){
     var container = document.getElementById("stops");
     container.innerHTML = "";
-    STOPS.forEach(function(st, idx){
+    var visibleCount = Math.min(state.unlocked || 1, STOPS.length);
+    STOPS.slice(0, visibleCount).forEach(function(st, idx){
       var wrap = document.createElement("div");
-      wrap.className = "stop"; wrap.id = st.id;
+      wrap.className = "stop" + (openStops[st.id] ? " open" : ""); wrap.id = st.id;
       var tagsHtml = st.tags.map(function(t){ return '<span class="tag">' + t + '</span>'; }).join("");
       wrap.innerHTML =
         '<div class="stop-head" data-toggle="' + st.id + '">' +
@@ -411,8 +432,8 @@
           '<svg class="chev" width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
         '</div>' +
         '<div class="stop-body">' +
-          '<div class="tip"><b>Le mot de l\'étape.</b> ' + st.tip + '</div>' +
-          '<div class="quiz"><h3>Quiz — Histoire de France · <span class="theme">' + st.theme + '</span></h3><div class="qlist"></div></div>' +
+          '<div class="tip"><b>' + (st.isBreak ? "Pause." : "Le mot de l'étape.") + '</b> ' + st.tip + '</div>' +
+          (st.isBreak ? '' : '<div class="quiz"><h3>Quiz — Histoire de France · <span class="theme">' + st.theme + '</span></h3><div class="qlist"></div></div>') +
         '</div>';
       container.appendChild(wrap);
 
@@ -425,7 +446,7 @@
         var choicesHtml = q.choices.map(function(c, ci){
           var cls = "choice"; var disabled = "";
           if(already){ disabled = "disabled"; if(ci === q.correct) cls += " correct"; }
-          return '<button type="button" class="' + cls + '" data-qkey="' + key + '" data-ci="' + ci + '" data-correct="' + q.correct + '" ' + disabled + '>' + c + '</button>';
+          return '<button type="button" class="' + cls + '" data-qkey="' + key + '" data-stop="' + st.id + '" data-ci="' + ci + '" data-correct="' + q.correct + '" ' + disabled + '>' + c + '</button>';
         }).join("");
         qEl.innerHTML =
           '<p class="qtext">' + (qi + 1) + '. ' + q.q + '</p>' +
@@ -433,13 +454,39 @@
           '<p class="explain' + (already ? ' show' : '') + '">' + q.explain + '</p>';
         qlist.appendChild(qEl);
       });
+
+      var allDone = st.questions.every(function(_, qi){ return state.answered.hasOwnProperty(st.id + "-" + qi); });
+      if(allDone && idx === visibleCount - 1 && visibleCount < STOPS.length){
+        var reveal = document.createElement("div");
+        reveal.className = "next-reveal";
+        reveal.innerHTML =
+          '<p class="next-label">Étape terminée</p>' +
+          '<button type="button" class="next-btn" data-unlock="' + visibleCount + '">Direction l\'étape ' + (visibleCount + 1) + ' →</button>';
+        wrap.querySelector(".stop-body").appendChild(reveal);
+      }
     });
+  }
+
+  function onNextClick(e){
+    var btn = e.target.closest(".next-btn");
+    if(!btn) return;
+    var unlockIdx = parseInt(btn.getAttribute("data-unlock"), 10);
+    if(state.unlocked <= unlockIdx){
+      state.unlocked = unlockIdx + 1;
+      openStops[STOPS[unlockIdx].id] = true;
+      saveState();
+      renderStops();
+      updateScoreUI();
+      var nextEl = document.getElementById(STOPS[unlockIdx].id);
+      if(nextEl){ nextEl.scrollIntoView({behavior:"smooth", block:"start"}); }
+    }
   }
 
   function onChoiceClick(e){
     var btn = e.target.closest(".choice");
     if(!btn || btn.disabled) return;
     var key = btn.getAttribute("data-qkey");
+    var stopId = btn.getAttribute("data-stop");
     var correctIdx = parseInt(btn.getAttribute("data-correct"), 10);
     var chosenIdx = parseInt(btn.getAttribute("data-ci"), 10);
     var isCorrect = chosenIdx === correctIdx;
@@ -454,19 +501,29 @@
     if(explain) explain.classList.add("show");
     state.answered[key] = isCorrect;
     saveState();
+
+    var st = STOPS.filter(function(s){ return s.id === stopId; })[0];
+    var justCompleted = st && st.questions.every(function(_, qi){ return state.answered.hasOwnProperty(st.id + "-" + qi); });
+    if(justCompleted){
+      openStops[stopId] = true;
+      renderStops();
+    }
     updateScoreUI();
   }
 
   function onHeadClick(e){
     var head = e.target.closest(".stop-head");
     if(!head) return;
-    document.getElementById(head.getAttribute("data-toggle")).classList.toggle("open");
+    var id = head.getAttribute("data-toggle");
+    var isOpen = document.getElementById(id).classList.toggle("open");
+    openStops[id] = isOpen;
   }
 
   function openStop(id){
     var el = document.getElementById(id);
     if(!el) return;
     el.classList.add("open");
+    openStops[id] = true;
     el.scrollIntoView({behavior:"smooth", block:"center"});
   }
 
@@ -483,7 +540,7 @@
     STOPS.forEach(function(st, idx){
       var icon = L.divIcon({
         className: '',
-        html: '<div class="num-pin">' + (idx + 1) + '</div>',
+        html: '<div class="num-pin">' + (st.isBreak ? '☕' : (idx + 1)) + '</div>',
         iconSize: [30, 30],
         iconAnchor: [15, 15]
       });
@@ -497,23 +554,20 @@
   }
 
   loadState();
+  openStops[STOPS[0].id] = true;
   renderStops();
   updateScoreUI();
 
   document.getElementById("stops").addEventListener("click", function(e){
     onChoiceClick(e);
     onHeadClick(e);
+    onNextClick(e);
   });
 
-  var first = document.getElementById(STOPS[0].id);
-  if(first) first.classList.add("open");
-
   loadNames();
-  ["certname1", "certname2"].forEach(function(id){
-    document.getElementById(id).addEventListener("input", function(){
-      saveNames();
-      updateCertUI();
-    });
+  document.getElementById("certname1").addEventListener("input", function(){
+    saveNames();
+    updateCertUI();
   });
   updateCertUI();
 
